@@ -3,6 +3,7 @@ import 'package:cooperative_navigation_safety/src/core/models/beacon_packet.dart
 import 'package:cooperative_navigation_safety/src/core/models/collision_alert.dart';
 
 class CollisionEngine {
+  static const int _maxBeaconAgeMs = 5000; // Align with peer pruning window
   static const double _earthRadius = 6371000; // meters
   static const double _safetyDistance = 10.0; // meters
   static const double _warningDistance = 5.0; // meters
@@ -16,10 +17,16 @@ class CollisionEngine {
     BeaconPacket localBeacon,
     BeaconPacket peerBeacon,
   ) {
-    final timeDelta = peerBeacon.timestamp.difference(localBeacon.timestamp).inMilliseconds.abs();
-    
-    // Skip stale data (older than 2 seconds)
-    if (timeDelta > 2000) {
+    final now = DateTime.now();
+    final localTime = localBeacon.receivedAt ?? localBeacon.timestamp;
+    final peerTime = peerBeacon.receivedAt ?? peerBeacon.timestamp;
+    final localAgeMs = now.difference(localTime).inMilliseconds;
+    final peerAgeMs = now.difference(peerTime).inMilliseconds;
+
+    // Skip if either packet is stale compared to the current clock.
+    // Use the same 5s window as beacon retention so intermittent packet loss
+    // doesn't suppress collision alerts prematurely.
+    if (localAgeMs > _maxBeaconAgeMs || peerAgeMs > _maxBeaconAgeMs) {
       return null;
     }
     

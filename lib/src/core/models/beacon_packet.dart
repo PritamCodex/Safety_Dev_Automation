@@ -16,6 +16,7 @@ class BeaconPacket {
   final int battery;
   final String mode;
   final double? rssi;
+  final DateTime? receivedAt;
 
   BeaconPacket({
     required this.type,
@@ -32,6 +33,7 @@ class BeaconPacket {
     required this.battery,
     required this.mode,
     this.rssi,
+    this.receivedAt,
   }) : id = const Uuid().v4();
 
   factory BeaconPacket.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,7 @@ class BeaconPacket {
       battery: json['battery'] ?? 0,
       mode: json['mode'] ?? 'normal',
       rssi: json['rssi']?.toDouble(),
+      receivedAt: null, // populated on receipt, not serialized
     );
   }
 
@@ -76,6 +79,7 @@ class BeaconPacket {
     String? type,
     String? ephemeralId,
     DateTime? timestamp,
+    DateTime? receivedAt,
     double? latitude,
     double? longitude,
     double? altitude,
@@ -92,6 +96,7 @@ class BeaconPacket {
       type: type ?? this.type,
       ephemeralId: ephemeralId ?? this.ephemeralId,
       timestamp: timestamp ?? this.timestamp,
+      receivedAt: receivedAt ?? this.receivedAt,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       altitude: altitude ?? this.altitude,
