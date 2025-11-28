@@ -184,7 +184,8 @@ class NearbyService {
         final json = jsonDecode(data);
         
         if (json['type'] == 'beacon') {
-          final beacon = BeaconPacket.fromJson(json);
+          final beacon =
+              BeaconPacket.fromJson(json).copyWith(receivedAt: DateTime.now());
           _beaconController.add(beacon);
         }
       } catch (e) {

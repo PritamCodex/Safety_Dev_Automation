@@ -100,6 +100,7 @@ final currentLocationProvider = Provider<BeaconPacket?>((ref) {
         type: 'self',
         ephemeralId: ref.read(nearbyServiceProvider).deviceId,
         timestamp: data.timestamp,
+        receivedAt: DateTime.now(),
         latitude: data.latitude ?? 0.0,
         longitude: data.longitude ?? 0.0,
         altitude: data.altitude ?? 0.0,
@@ -148,6 +149,7 @@ class SystemCoordinator {
   final Ref _ref;
   StreamSubscription? _sensorSubscription;
   StreamSubscription? _beaconSubscription;
+  final Map<String, DateTime> _peerLastSeen = {};
   
   SystemCoordinator(this._ref);
   
@@ -218,17 +220,22 @@ class SystemCoordinator {
     // Listen to incoming beacons
     _beaconSubscription = nearbyService.beaconStream.listen((beacon) {
       final currentPeers = _ref.read(peerBeaconsProvider);
-      
+      final now = DateTime.now();
+
+      // Track last time we heard from this peer using local clock to avoid
+      // device clock skew from immediately expiring packets.
+      _peerLastSeen[beacon.ephemeralId] = now;
+
       // Update or add peer beacon
       final updatedPeers = currentPeers.where((p) => p.ephemeralId != beacon.ephemeralId).toList();
       updatedPeers.add(beacon);
-      
-      // Remove stale beacons (older than 5 seconds)
-      final now = DateTime.now();
-      final freshPeers = updatedPeers.where((p) => 
-        now.difference(p.timestamp).inSeconds < 5
-      ).toList();
-      
+
+      // Remove stale beacons (older than 5 seconds) using local receipt time
+      final freshPeers = updatedPeers.where((p) {
+        final lastSeen = _peerLastSeen[p.ephemeralId];
+        return lastSeen != null && now.difference(lastSeen).inSeconds < 5;
+      }).toList();
+
       _ref.read(peerBeaconsProvider.notifier).state = freshPeers;
     });
   }
@@ -237,13 +244,15 @@ class SystemCoordinator {
     final appState = _ref.read(appStateProvider);
     final sensorDataValue = _ref.read(sensorDataStreamProvider);
     final nearbyService = _ref.read(nearbyServiceProvider);
+    final now = DateTime.now();
     
     final sensorData = sensorDataValue.value;
     
     return BeaconPacket(
       type: 'beacon',
       ephemeralId: nearbyService.deviceId, // Use consistent device ID from nearby service
-      timestamp: DateTime.now(),
+      timestamp: now,
+      receivedAt: now,
       latitude: sensorData?.latitude ?? 0.0,
       longitude: sensorData?.longitude ?? 0.0,
       altitude: sensorData?.altitude ?? 0.0,
